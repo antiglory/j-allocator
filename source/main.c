@@ -1,12 +1,15 @@
 #include "include/header.h"
 
+// global vars
+
+// initializing jalloc main bin
 chunk_t* cachebin[NUM_BINS] = {NULL};
 
 // just-align-size
 static size_t jalignsize(size_t size) {
-    if (size % CHUNK_ALIGNMENT != 0) {
+    if (size % CHUNK_ALIGNMENT != 0) 
         size += CHUNK_ALIGNMENT - (size % CHUNK_ALIGNMENT);
-    }
+
     return size;
 }
 
@@ -18,17 +21,16 @@ int jgetbinindex(const size_t size) {
 // just-allocate
 void* jalloc(const size_t _Size, const byte_t _Priv) {
     int prot, flags;
+
     void* page_start;
 
-    if ((_Priv & 0x7)!= _Priv) {
+    if ((_Priv & 0x7) != _Priv)
         return NULL;
-    }
 
-    if (_Priv & PROT_EXEC_BIT) {
-        prot = PROT_READ | PROT_WRITE | PROT_EXEC;
-    } else {
+    if (_Priv & PROT_EXEC_BIT)
+        prot = PROT_READ | PROT_WRITE | PROT_EXEC; 
+    else
         prot = PROT_READ | PROT_WRITE;
-    }
 
     flags = MAP_PRIVATE | MAP_ANONYMOUS;
 
@@ -36,6 +38,7 @@ void* jalloc(const size_t _Size, const byte_t _Priv) {
 
     // find the appropriate bin
     const int binindex = jgetbinindex(f_Size);
+
     chunk_t* current = cachebin[binindex];
     chunk_t* prev = NULL;
 
@@ -44,24 +47,27 @@ void* jalloc(const size_t _Size, const byte_t _Priv) {
         if (current->size >= f_Size && current->CHUNK_INUSE == FALSE) {
             current->CHUNK_INUSE = TRUE;
             current->priv = _Priv;
+
             void* payload_area = (void*)((char*)current + sizeof(chunk_t));
+
             mprotect(payload_area, f_Size - sizeof(chunk_t), prot);
+
             return payload_area;
         }
+
         prev = current;
         current = current->fd;
     }
 
     // no reusable chunk found then allocate one
     chunk_t* lastchunk = NULL;
-    if (prev!= NULL) {
+
+    if (prev != NULL) {
         lastchunk = prev;
         page_start = (void*)((char*)lastchunk + lastchunk->size + CHUNK_ALIGNMENT);
     } else {
         page_start = sbrk(0);
-        if (sbrk(f_Size) == (void*)-1) {
-            return NULL;
-        }
+        if (sbrk(f_Size) == (void*)-1) return NULL;
     }
 
     memset(page_start, 0, f_Size);
@@ -73,15 +79,11 @@ void* jalloc(const size_t _Size, const byte_t _Priv) {
     new_chunk.CHUNK_INUSE = TRUE;
     new_chunk.IS_MMAPED = FALSE;
     new_chunk.PREV_INUSE = FALSE;
-    new_chunk.NON_MAIN_ARENA = FALSE;
 
     memcpy(page_start, &new_chunk, sizeof(chunk_t));
 
-    if (prev!= NULL) {
-        prev->fd = page_start;
-    } else {
-        cachebin[binindex] = page_start;
-    }
+    if (prev != NULL) prev->fd = page_start;
+    else cachebin[binindex] = page_start;
 
     void* payload_area = (void*)((char*)page_start + sizeof(chunk_t));
     mprotect(payload_area, f_Size - sizeof(chunk_t), prot);
@@ -91,10 +93,12 @@ void* jalloc(const size_t _Size, const byte_t _Priv) {
 
 // just-free
 void jfree(void* ptr) {
-    if (ptr == NULL) return;
+    if (!ptr) return;
 
     chunk_t* chunk = (chunk_t*)((char*)ptr - sizeof(chunk_t));
     chunk->CHUNK_INUSE = FALSE;
+
+    return;
 }
 
 int main(void) {

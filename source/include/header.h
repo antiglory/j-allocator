@@ -3,11 +3,11 @@
 
 // system libs including
 
-#include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <inttypes.h>
 
 // macros
 #define TRUE 1
@@ -31,6 +31,7 @@ typedef struct chunk_t {
 
     byte_t CHUNK_INUSE;
     byte_t PREV_INUSE;
+    byte_t NON_MAIN_ARENA;
     byte_t IS_MMAPED;
 
     struct chunk_t* fd;

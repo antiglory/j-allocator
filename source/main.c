@@ -104,6 +104,10 @@ void jfree(void* ptr) {
 
 int main(void) {
     int* heap = jalloc(4, 0x1 | 0x2);
+    // jalloc(sizeof(int), PROT_READ_BIT | PROT_WRITE_BIT);
+
+    if (!heap) return 1;
+
     *heap = 10;
 
     printf("[%p]  : %d\n", heap, *heap);

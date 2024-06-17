@@ -76,6 +76,7 @@ void* jalloc(const size_t _Size, const byte_t _Priv) {
     new_chunk.size = f_Size;
     new_chunk.priv = _Priv;
     new_chunk.fd = NULL;
+    new_chunk.bk = NULL;
     new_chunk.CHUNK_INUSE = TRUE;
     new_chunk.IS_MMAPED = FALSE;
     new_chunk.PREV_INUSE = FALSE;

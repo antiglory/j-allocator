@@ -31,7 +31,6 @@ typedef struct chunk_t {
 
     byte_t CHUNK_INUSE;
     byte_t PREV_INUSE;
-    byte_t NON_MAIN_ARENA;
     byte_t IS_MMAPED;
 
     struct chunk_t* fd;

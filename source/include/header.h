@@ -9,7 +9,6 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
-
 // macros
 #define TRUE 1
 #define FALSE 0

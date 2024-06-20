@@ -1,5 +1,5 @@
 # j-allocator
-__(just-allocate)__
+(just-allocate)
 a very simple and basic heap allocator written in C
 
 # obs

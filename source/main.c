@@ -1,7 +1,5 @@
 #include "include/main.h"
 
-// global vars
-
 // initializing jalloc main bin
 chunk_t* jcachebin[JCACHE_BINS_NUM] = {NULL};
 
@@ -112,13 +110,17 @@ void jfree(void* ptr) {
 }
 
 int main(void) {
-    int* heap = jalloc(4, 0x1 | 0x2);
+    const char my_string[] = "hello fucking world\0";
+
+    char* heap = jalloc(sizeof(my_string), 0x1 | 0x2);
     // jalloc(sizeof(int), PROT_READ_BIT | PROT_WRITE_BIT);
 
     if (!heap) return 1;
 
-    *heap = 10;
+    strcpy(heap, my_string);
 
-    jfree(heap);
+    printf("%s\n", heap);
+
+    jfree(heap); // may result in a segfault because printf()
     return 0;
 }

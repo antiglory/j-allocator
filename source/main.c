@@ -1,7 +1,7 @@
 #include "include/main.h"
 
 /*
-exemplo:
+exemplo do algoritmo (duplamente linkado):
 
 pwndbg> p jcachebin
 $1 = {0x555555559000, 0x0 <repeats 15 times>}
@@ -20,7 +20,7 @@ $3 = {
   bk = 0x555555559000
 }
 pwndbg> p *(*jcachebin[0]->fd)->fd
-$6 = {
+$4 = {
   size = 40,
   flags = 3 '\003',
   fd = 0x0,

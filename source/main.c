@@ -19,7 +19,7 @@ int jgetbinindex(const size_t size) {
 void jcoalescechunk(chunk_t* chunk) {
     const chunk_t* next_chunk = (chunk_t*)((char*)chunk + chunk->size);
 
-    if (!(next_chunk->flags & CHUNK_INUSE_BIT)) {
+    if (!(next_chunk->flags & INUSE_BIT)) {
         chunk->size += next_chunk->size;
         chunk->fd = next_chunk->fd;
 
@@ -52,8 +52,8 @@ void* jalloc(const size_t size, const byte_t priv) {
 
     // search for a reusable chunk in the current bin
     while (current_chunk != NULL) {
-        if (current_chunk->size >= aligned_size && !(current_chunk->flags & CHUNK_INUSE_BIT)) {
-            current_chunk->flags |= CHUNK_INUSE_BIT;
+        if (current_chunk->size >= aligned_size && !(current_chunk->flags & INUSE_BIT)) {
+            current_chunk->flags |= INUSE_BIT;
             current_chunk->flags = (current_chunk->flags & 0xF0) | (priv & 0x0F); // store priv in lower 4 bits
 
             void* payload_area = (void*)((char*)current_chunk + sizeof(chunk_t));
@@ -81,7 +81,7 @@ void* jalloc(const size_t size, const byte_t priv) {
     // initializing a new chunk's headers
     chunk_t* new_chunk = (chunk_t*)page_start;
     new_chunk->size = aligned_size;
-    new_chunk->flags = CHUNK_INUSE_BIT | (priv & 0x0F);
+    new_chunk->flags = INUSE_BIT | (priv & 0x0F);
     new_chunk->fd = NULL;
     new_chunk->bk = NULL;
 
@@ -102,9 +102,9 @@ void jfree(void* ptr) {
 
     chunk_t* chunk = (chunk_t*)((char*)ptr - sizeof(chunk_t));
 
-    if (!(chunk->flags & CHUNK_INUSE_BIT)) return; // sanity check
+    if (!(chunk->flags & INUSE_BIT)) return; // sanity check
 
-    chunk->flags &= ~CHUNK_INUSE_BIT;
+    chunk->flags &= ~INUSE_BIT;
 
     jcoalescechunk(chunk);
 

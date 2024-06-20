@@ -22,9 +22,9 @@
 #define PROT_WRITE_BIT  0x2
 #define PROT_EXEC_BIT   0x4
 
-#define INUSE_BIT           0x1
-#define PREV_INUSE_BIT      0x2
-#define IS_MMAPED_BIT       0x4
+#define INUSE_BIT       0x1
+#define PREV_INUSE_BIT  0x2
+#define IS_MMAPED_BIT   0x4
 
 // typedefs
 typedef unsigned char byte_t;

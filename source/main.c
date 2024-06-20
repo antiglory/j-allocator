@@ -1,7 +1,5 @@
 #include "include/main.h"
 
-// global vars
-
 // initializing jalloc main bin
 chunk_t* jcachebin[JCACHE_BINS_NUM] = {NULL};
 
@@ -11,12 +9,12 @@ static size_t jalignsize(const size_t size) {
 }
 
 // just-get-bin-index
-int jgetbinindex(const size_t size) {
+static int jgetbinindex(const size_t size) {
     return (size / JCACHE_BIN_SIZE_INCREMENT) < JCACHE_BINS_NUM ? (size / JCACHE_BIN_SIZE_INCREMENT) : (JCACHE_BINS_NUM - 1);
 }
 
 // helper to coalesce adjacent free chunks
-void jcoalescechunk(chunk_t* chunk) {
+static void jcoalescechunk(chunk_t* chunk) {
     const chunk_t* next_chunk = (chunk_t*)((char*)chunk + chunk->size);
 
     if (!(next_chunk->flags & INUSE_BIT)) {

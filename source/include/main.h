@@ -1,7 +1,5 @@
-#ifndef MAIN_H
-#define MAIN_H
-
-// system libs including
+#ifndef HEADER_H
+#define HEADER_H
 
 #include <stdio.h>
 #include <string.h>
@@ -15,7 +13,7 @@
 
 #define CHUNK_ALIGNMENT_BYTES 8
 
-#define JCACHE_BINS_NUM 8
+#define JCACHE_BIN_NUM 16
 #define JCACHE_BIN_SIZE_INCREMENT 128
 
 #define PROT_READ_BIT   0x1
@@ -30,8 +28,9 @@
 typedef unsigned char byte_t;
 
 typedef struct chunk_t {
-    size_t size;
-    byte_t flags; // PREV_INUSE, INUSE and MMAPED
+    size_t size;        // chunk size
+    size_t hsize;       // headers size
+    byte_t flags;       // PREV_INUSE, INUSE and MMAPED
     struct chunk_t* fd; // forward chunk pointer
     struct chunk_t* bk; // backward chunk pointer
 } chunk_t;

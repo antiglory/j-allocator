@@ -92,7 +92,10 @@ void* jalloc(const size_t size, const byte_t priv) {
         jcachebin[bin_index] = chunk;
 
     void* payload_area = (void*)((char*)chunk + sizeof(chunk_t));
+
     mprotect(payload_area, aligned_size - sizeof(chunk_t), protection_flags);
+
+    jcoalescechunk(chunk);
 
     return payload_area;
 }
@@ -107,7 +110,8 @@ void jfree(void* ptr) {
 
     chunk->flags &= ~INUSE_BIT;
 
-    jcoalescechunk(chunk);
+    if (chunk->fd)
+        chunk->fd->bk = NULL;
 
     return;
 }

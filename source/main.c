@@ -1,7 +1,41 @@
 #include "include/main.h"
 
+/*
+exemplo:
+
+pwndbg> p jcachebin
+$1 = {0x555555559000, 0x0 <repeats 15 times>}
+pwndbg> p *jcachebin[0]
+$2 = {
+  size = 40,
+  flags = 3 '\003',
+  fd = 0x555555559028,
+  bk = 0x0
+}
+pwndbg> p *((*jcachebin[0])->fd)
+$3 = {
+  size = 40,
+  flags = 3 '\003',
+  fd = 0x555555559050,
+  bk = 0x555555559000
+}
+pwndbg> p *(*jcachebin[0]->fd)->fd
+$6 = {
+  size = 40,
+  flags = 3 '\003',
+  fd = 0x0,
+  bk = 0x555555559028
+}
+*/
+
+/*
+algumas circunstancias:
+    - quando uma chunk é liberada, se essa tal chunk estiver presente no jcachebin, a chunk na jcachebin será sobrescrevida com a chunk que estiver no fd
+    - quando uma nova chunk é alocada, se ela não for contígua à chunk mais recente por algum motivo, ela será adicionada a jcachebin
+*/
+
 // initializing jalloc main bin
-chunk_t* jcachebin[JCACHE_BINS_NUM] = {NULL};
+chunk_t* jcachebin[JCACHE_BIN_NUM] = {NULL};
 
 // just-align-size
 static size_t jalignsize(const size_t size) {
@@ -10,7 +44,7 @@ static size_t jalignsize(const size_t size) {
 
 // just-get-bin-index
 static int jgetbinindex(const size_t size) {
-    return (size / JCACHE_BIN_SIZE_INCREMENT) < JCACHE_BINS_NUM ? (size / JCACHE_BIN_SIZE_INCREMENT) : (JCACHE_BINS_NUM - 1);
+    return (size / JCACHE_BIN_SIZE_INCREMENT) < JCACHE_BIN_NUM ? (size / JCACHE_BIN_SIZE_INCREMENT) : (JCACHE_BIN_NUM - 1);
 }
 
 // helper to coalesce adjacent free chunks
@@ -52,7 +86,7 @@ void* jalloc(const size_t size, const byte_t priv) {
     while (current_chunk != NULL) {
         if (current_chunk->size >= aligned_size && !(current_chunk->flags & INUSE_BIT)) {
             current_chunk->flags |= INUSE_BIT;
-            current_chunk->flags = (current_chunk->flags & 0xF0) | (priv & 0x0F); // store priv in lower 4 bits
+            current_chunk->flags = (current_chunk->flags & 0xF0) | (priv & 0x0F); // store priv in lower 4 bits of current_chunk->flags byte
 
             void* payload_area = (void*)((char*)current_chunk + sizeof(chunk_t));
 
@@ -66,36 +100,30 @@ void* jalloc(const size_t size, const byte_t priv) {
     }
 
     // no reusable chunk found, allocate a new one
-    if (previous_chunk != NULL)
-        chunk = (void*)((char*)previous_chunk + previous_chunk->size + CHUNK_ALIGNMENT_BYTES);
-    else {
-        chunk = sbrk(0);
+    chunk = sbrk(0);
 
-        if (sbrk(aligned_size) == (void*)-1)
-            return NULL;
-    }
+    if (sbrk(aligned_size) == (void*)-1)
+        return NULL;
 
     memset(chunk, 0, aligned_size);
 
     // initializing a new chunk's headers
-    chunk_t new_chunk;
-    new_chunk.size = aligned_size;
-    new_chunk.flags = INUSE_BIT | (priv & 0x0F);
-    new_chunk.fd = NULL;
-    new_chunk.bk = NULL;
-
-    memcpy(chunk, &new_chunk, sizeof(chunk_t));
+    chunk_t* new_chunk = (chunk_t*)chunk;
+    new_chunk->size = aligned_size;
+    new_chunk->flags = INUSE_BIT | (priv & 0x0F);
+    new_chunk->fd = NULL;
+    new_chunk->bk = previous_chunk;
 
     if (previous_chunk != NULL)
-        previous_chunk->fd = chunk;
+        previous_chunk->fd = new_chunk;
     else
-        jcachebin[bin_index] = chunk;
+        jcachebin[bin_index] = new_chunk;
 
-    void* payload_area = (void*)((char*)chunk + sizeof(chunk_t));
+    void* payload_area = (void*)((char*)new_chunk + sizeof(chunk_t));
 
     mprotect(payload_area, aligned_size - sizeof(chunk_t), protection_flags);
 
-    jcoalescechunk(chunk);
+    jcoalescechunk(new_chunk);
 
     return payload_area;
 }
@@ -111,23 +139,30 @@ void jfree(void* ptr) {
     chunk->flags &= ~INUSE_BIT;
 
     if (chunk->fd)
-        chunk->fd->bk = NULL;
+        chunk->fd->bk = chunk->bk;
+
+    if (chunk->bk)
+        chunk->bk->fd = chunk->fd;
+    else {
+        const int bin_index = jgetbinindex(chunk->size);
+        jcachebin[bin_index] = chunk->fd;
+    }
+
+    jcoalescechunk(chunk);
 
     return;
 }
 
 int main(void) {
-    const char my_string[] = "hello fucking world\0";
+    const char string[] = "goodbye world\0";
 
-    char* heap = jalloc(sizeof(my_string), 0x1 | 0x2);
-    // jalloc(sizeof(int), PROT_READ_BIT | PROT_WRITE_BIT);
-
+    char* heap = jalloc(sizeof(string), PROT_READ_BIT | PROT_WRITE_BIT);
     if (!heap) return 1;
 
-    strcpy(heap, my_string);
+    strcpy(heap, string);
 
     printf("%s\n", heap);
 
-    jfree(heap); // may result in a segfault because printf()
+    jfree(heap);
     return 0;
 }

@@ -110,6 +110,7 @@ void* jalloc(const size_t size, const byte_t priv) {
     // initializing a new chunk's headers
     chunk_t* new_chunk = (chunk_t*)chunk;
     new_chunk->size = aligned_size;
+    new_chunk->hsize = sizeof(chunk_t);
     new_chunk->flags = INUSE_BIT | (priv & 0x0F);
     new_chunk->fd = NULL;
     new_chunk->bk = previous_chunk;

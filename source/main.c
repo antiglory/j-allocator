@@ -1,31 +1,65 @@
 #include "include/main.h"
-// TODO: quando uma chunk for encontrada e for utilizada, atualizar o tamanho dela (talvez o tamanho dos headers também) com o novo tamanho dela a partir do que foi pedido nos argumentos (_Size)
 
 /*
 example of the (double) linked algorithm between chunks:
+
+(code)
+int main(void) {
+  char* chunk1 = jalloc(sizeof(int), PROT_READ_BIT | PROT_WRITE_BIT);
+  char* chunk2 = jalloc(sizeof(int), PROT_READ_BIT | PROT_WRITE_BIT);
+  char* chunk3 = jalloc(sizeof(int), PROT_READ_BIT | PROT_WRITE_BIT);
+
+  if (!chunk1 || !chunk2 || !chunk3) return 0;
+
+  *chunk1 = 10;
+  *chunk2 = 20;
+  *chunk3 = 30;
+
+  jfree(chunk1);
+  jfree(chunk2);
+  jfree(chunk3);
+  return 0;
+}
+
+(context)
+────────────────[ DISASM / x86-64 / set emulate on ]──────────────────────
+ ► 0x5555555555c4 <main+125>    call   jfree                       <jfree>
+        rdi: 0x555555559028 ◂— 0xa
+────────[ SOURCE (CODE) ]─────────────────────────────────────────────────
+In file: /.../.../.../.../.../source/main.c:164
+   159
+   160   *chunk1 = 10;
+   161   *chunk2 = 20;
+   162   *chunk3 = 30;
+   163
+ ► 164   jfree(chunk1);
+──────────────────────────────────────────────────────────────────────────
 
 pwndbg> p jcachebin
 $1 = {0x555555559000, 0x0 <repeats 15 times>}
 pwndbg> p *jcachebin[0]
 $2 = {
-  size = 40,
+  size = 48,
+  hsize = 40,
   flags = 3 '\003',
-  fd = 0x555555559028,
+  fd = 0x555555559030,
   bk = 0x0
 }
 pwndbg> p *((*jcachebin[0])->fd)
 $3 = {
-  size = 40,
+  size = 48,
+  hsize = 40,
   flags = 3 '\003',
-  fd = 0x555555559050,
+  fd = 0x555555559060,
   bk = 0x555555559000
 }
 pwndbg> p *(*jcachebin[0]->fd)->fd
 $4 = {
-  size = 40,
+  size = 48,
+  hsize = 40,
   flags = 3 '\003',
   fd = 0x0,
-  bk = 0x555555559028
+  bk = 0x555555559030
 }
 */
 
@@ -154,7 +188,7 @@ int main(void) {
     const char string[] = "goodbye world\0";
 
     char* heap = jalloc(sizeof(string), PROT_READ_BIT | PROT_WRITE_BIT);
-    if (!heap) return 1;
+    if (!(int)heap) return 1;
 
     strcpy(heap, string);
 

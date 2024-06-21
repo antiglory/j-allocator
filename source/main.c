@@ -1,4 +1,5 @@
 #include "include/main.h"
+// TODO: quando uma chunk for encontrada e for utilizada, atualizar o tamanho dela (talvez o tamanho dos headers também) com o novo tamanho dela a partir do que foi pedido nos argumentos (_Size)
 
 /*
 example of the (double) linked algorithm between chunks:
@@ -29,7 +30,7 @@ $4 = {
 */
 
 // initializing jalloc main bin
-chunk_t* jcachebin[JCACHE_BIN_NUM] = {NULL};
+chunk_t* jcachebin[JCACHE_CHUNK_AMOUNT] = {NULL};
 
 // just-align-size
 static size_t jalignsize(const size_t size) {
@@ -38,7 +39,7 @@ static size_t jalignsize(const size_t size) {
 
 // just-get-bin-index
 static int jgetbinindex(const size_t size) {
-    return (size / JCACHE_BIN_SIZE_INCREMENT) < JCACHE_BIN_NUM ? (size / JCACHE_BIN_SIZE_INCREMENT) : (JCACHE_BIN_NUM - 1);
+    return (size / JCACHE_SIZE_INCREMENT) < JCACHE_CHUNK_AMOUNT ? (size / JCACHE_SIZE_INCREMENT) : (JCACHE_CHUNK_AMOUNT - 1);
 }
 
 // helper to coalesce adjacent free chunks

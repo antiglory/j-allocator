@@ -1,7 +1,7 @@
 #include "include/main.h"
 
 /*
-exemplo do algoritmo (duplamente linkado):
+example of the (double) linked algorithm between chunks:
 
 pwndbg> p jcachebin
 $1 = {0x555555559000, 0x0 <repeats 15 times>}
@@ -26,12 +26,6 @@ $4 = {
   fd = 0x0,
   bk = 0x555555559028
 }
-*/
-
-/*
-algumas circunstancias:
-    - quando uma chunk é liberada, se essa tal chunk estiver presente no jcachebin, a chunk na jcachebin será sobrescrevida com a chunk que estiver no fd
-    - quando uma nova chunk é alocada, se ela não for contígua à chunk mais recente por algum motivo, ela será adicionada a jcachebin
 */
 
 // initializing jalloc main bin
@@ -127,6 +121,7 @@ void* jalloc(const size_t size, const byte_t priv) {
     jcoalescechunk(new_chunk);
 
     return payload_area;
+    // the payload area is the area ready for use by the user
 }
 
 // just-free

@@ -8,12 +8,12 @@
 #include <inttypes.h>
 
 // macros
-#define TRUE 1
+#define TRUE  1
 #define FALSE 0
 
 #define CHUNK_ALIGNMENT_BYTES 8
 
-#define JCACHE_CHUNK_AMOUNT 16
+#define JCACHE_CHUNK_AMOUNT   16
 #define JCACHE_SIZE_INCREMENT 128
 
 #define PROT_READ_BIT   0x1

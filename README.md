@@ -1,6 +1,12 @@
 # j-allocator
 a very simple and basic heap allocator written in C
 
+# features
+- first fit and segregated free list heap allocator (has aspects of both);
+- performs linear searches to allocate new chunks or to find existing chunks which have been released and are ready for use;
+- uses bins as the basis of the algorithm;
+- chunks have robust identification from the headers.
+
 # note
 - same as libc allocator, the responsibility of not exceeding the bounds of the allocated chunk belongs to the programmer/you;
 - the stability and integrity of a allocated chunk or the heap in general is not guaranteed;

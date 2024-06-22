@@ -3,7 +3,7 @@ a very simple and basic linux heap allocator written in C
 
 # features
 - first fit and segregated free list heap allocator (has aspects of both);
-- performs linear searches to allocate new chunks or to find existing chunks which have been freed and are ready for use;
+- performs linear searches to allocate new chunks or to find existing chunks;
 - chunks have robust identification from the headers.
 - uses bins as the basis of the algorithm;
 

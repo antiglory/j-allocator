@@ -3,22 +3,24 @@
 /*
 example of the (double) linked algorithm between chunks:
 
+(compiled with: `gcc -g -o main main.c`)
+
 (code)
 int main(void) {
-  char* chunk1 = jalloc(sizeof(int), PROT_READ_BIT | PROT_WRITE_BIT);
-  char* chunk2 = jalloc(sizeof(int), PROT_READ_BIT | PROT_WRITE_BIT);
-  char* chunk3 = jalloc(sizeof(int), PROT_READ_BIT | PROT_WRITE_BIT);
+    char* chunk1 = jalloc(sizeof(int), PROT_READ_BIT | PROT_WRITE_BIT);
+    char* chunk2 = jalloc(sizeof(int), PROT_READ_BIT | PROT_WRITE_BIT);
+    char* chunk3 = jalloc(sizeof(int), PROT_READ_BIT | PROT_WRITE_BIT);
 
-  if (!chunk1 || !chunk2 || !chunk3) return 0;
+    if (!chunk1 || !chunk2 || !chunk3) return 0;
 
-  *chunk1 = 10;
-  *chunk2 = 20;
-  *chunk3 = 30;
+    *chunk1 = 10;
+    *chunk2 = 20;
+    *chunk3 = 30;
 
-  jfree(chunk1);
-  jfree(chunk2);
-  jfree(chunk3);
-  return 0;
+    jfree(chunk1);
+    jfree(chunk2);
+    jfree(chunk3);
+    return 0;
 }
 
 (context)
@@ -34,7 +36,6 @@ In file: /.../.../.../.../.../source/main.c:164
    163
  ► 164   jfree(chunk1);
 ──────────────────────────────────────────────────────────────────────────
-
 pwndbg> p jcachebin
 $1 = {0x555555559000, 0x0 <repeats 15 times>}
 pwndbg> p *jcachebin[0]
@@ -66,17 +67,17 @@ $4 = {
 // initializing jalloc main bin
 chunk_t* jcachebin[JCACHE_CHUNK_AMOUNT] = {NULL};
 
-// just-align-size
+// helper to align chunk size
 static size_t jalignsize(const size_t size) {
     return (size + CHUNK_ALIGNMENT_BYTES - 1) & ~(CHUNK_ALIGNMENT_BYTES - 1);
 }
 
-// just-get-bin-index
+// helper to get jcache index
 static int jgetbinindex(const size_t size) {
     return (size / JCACHE_SIZE_INCREMENT) < JCACHE_CHUNK_AMOUNT ? (size / JCACHE_SIZE_INCREMENT) : (JCACHE_CHUNK_AMOUNT - 1);
 }
 
-// helper to coalesce adjacent free chunks
+// helper to coalesce a chunk
 static void jcoalescechunk(chunk_t* chunk) {
     const chunk_t* next_chunk = (chunk_t*)((char*)chunk + chunk->size);
 
@@ -89,9 +90,12 @@ static void jcoalescechunk(chunk_t* chunk) {
     }
 }
 
+// jalloc main implementation
 void* jalloc(const size_t size, const byte_t priv) {
     int protection_flags;
+
     const size_t aligned_size = jalignsize(size + sizeof(chunk_t));
+    const size_t page_size = sysconf(_SC_PAGESIZE);
 
     void* chunk; // page start
 
@@ -119,7 +123,9 @@ void* jalloc(const size_t size, const byte_t priv) {
 
             void* payload_area = (void*)((char*)current_chunk + sizeof(chunk_t));
 
-            mprotect(payload_area, aligned_size - sizeof(chunk_t), protection_flags);
+            if (mprotect((void*)((uintptr_t)payload_area & ~(page_size - 1)), aligned_size, protection_flags) == -1) {
+                return NULL;
+            }
 
             return payload_area;
         }
@@ -151,7 +157,9 @@ void* jalloc(const size_t size, const byte_t priv) {
 
     void* payload_area = (void*)((char*)new_chunk + sizeof(chunk_t));
 
-    mprotect(payload_area, aligned_size - sizeof(chunk_t), protection_flags);
+    if (mprotect((void*)((uintptr_t)payload_area & ~(page_size - 1)), aligned_size, protection_flags) == -1) {
+        return NULL;
+    }
 
     jcoalescechunk(new_chunk);
 
@@ -159,7 +167,7 @@ void* jalloc(const size_t size, const byte_t priv) {
     // the payload area is the area ready for use by the user
 }
 
-// just-free
+// a part of jalloc implementation, is a function to free the allocated chunk
 void jfree(void* ptr) {
     if (!ptr) return;
 
@@ -185,15 +193,23 @@ void jfree(void* ptr) {
 }
 
 int main(void) {
-    const char string[] = "goodbye world\0";
+    // (code)
+    const char c[] = {
+        0x90, 0x90,                    // nop^2
+        0xb8, 0x69, 0x00, 0x00, 0x00,  // mov $0x69, %eax
+        0xc3                           // ret
+    };
 
-    char* heap = jalloc(sizeof(string), PROT_READ_BIT | PROT_WRITE_BIT);
-    if (!(int)heap) return 1;
+    int* chunk = jalloc(sizeof(c), PROT_READ_BIT | PROT_WRITE_BIT | PROT_EXEC_BIT);
+    if (!chunk) return 1;
 
-    strcpy(heap, string);
+    memcpy(chunk, c, sizeof(c));
 
-    printf("%s\n", heap);
+    int v = ((int(*)())chunk)();
+    if (!v) return 1;
 
-    jfree(heap);
+    printf("returned '0x%x'\n", v);
+
+    jfree(chunk);
     return 0;
 }

@@ -122,11 +122,11 @@ void* jalloc(const size_t size, const byte_t priv) {
             size_t remaining_size = current_chunk->size - aligned_size;
 
             if (remaining_size >= sizeof(chunk_t) + CHUNK_ALIGNMENT_BYTES) {
-                // Split the chunk
+                // split the chunk if there's enough space for a new chunk
                 chunk_t* new_chunk = (chunk_t*)((char*)current_chunk + aligned_size);
                 new_chunk->size = remaining_size;
                 new_chunk->hsize = sizeof(chunk_t);
-                new_chunk->flags = current_chunk->flags & ~INUSE_BIT; // Clear INUSE_BIT for new chunk
+                new_chunk->flags = current_chunk->flags & ~INUSE_BIT; // clear INUSE_BIT for new chunk
                 new_chunk->fd = current_chunk->fd;
                 new_chunk->bk = current_chunk;
 
@@ -153,7 +153,7 @@ void* jalloc(const size_t size, const byte_t priv) {
         current_chunk = current_chunk->fd;
     }
 
-    // no reusable chunk found, allocate a new one
+    // no reusable chunk found, then allocate a new one
     chunk = sbrk(0);
 
     if (sbrk(aligned_size) == (void*)-1)
@@ -183,8 +183,9 @@ void* jalloc(const size_t size, const byte_t priv) {
     jcoalescechunk(new_chunk);
 
     return payload_area;
-    // the payload area is the area ready for use by the user
+    // the payload area is the area which is read for use by the user
 }
+
 
 // a part of jalloc implementation, is a function to free the allocated chunk
 void jfree(void* ptr) {
@@ -196,19 +197,20 @@ void jfree(void* ptr) {
 
     chunk->flags &= ~INUSE_BIT;
 
-    if (chunk->fd)
+    if (chunk->fd) {
         chunk->fd->bk = chunk->bk;
+    }
 
-    if (chunk->bk)
+    if (chunk->bk) {
         chunk->bk->fd = chunk->fd;
-    else {
-        const int bin_index = jgetbinindex(chunk->size);
-        jcachebin[bin_index] = chunk->fd;
+    } else {
+        if (chunk->fd) {
+            const int bin_index = jgetbinindex(chunk->size);
+            jcachebin[bin_index] = chunk->fd;
+        } // if no chunk->fd, just keep the chunk in jcache but set it as out of use
     }
 
     jcoalescechunk(chunk);
-
-    return;
 }
 
 int main(void) {

@@ -1,5 +1,5 @@
 # j-allocator
-a very simple and basic heap allocator written in C
+a very simple and basic linux heap allocator written in C
 
 # features
 - first fit and segregated free list heap allocator (has aspects of both);

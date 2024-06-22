@@ -36,6 +36,7 @@ In file: /.../.../.../.../.../source/main.c:164
    163
  ► 164   jfree(chunk1);
 ──────────────────────────────────────────────────────────────────────────
+
 pwndbg> p jcachebin
 $1 = {0x555555559000, 0x0 <repeats 15 times>}
 pwndbg> p *jcachebin[0]
@@ -118,6 +119,24 @@ void* jalloc(const size_t size, const byte_t priv) {
     // search for a reusable chunk in the current bin
     while (current_chunk != NULL) {
         if (current_chunk->size >= aligned_size && !(current_chunk->flags & INUSE_BIT)) {
+            size_t remaining_size = current_chunk->size - aligned_size;
+
+            if (remaining_size >= sizeof(chunk_t) + CHUNK_ALIGNMENT_BYTES) {
+                // Split the chunk
+                chunk_t* new_chunk = (chunk_t*)((char*)current_chunk + aligned_size);
+                new_chunk->size = remaining_size;
+                new_chunk->hsize = sizeof(chunk_t);
+                new_chunk->flags = current_chunk->flags & ~INUSE_BIT; // Clear INUSE_BIT for new chunk
+                new_chunk->fd = current_chunk->fd;
+                new_chunk->bk = current_chunk;
+
+                if (current_chunk->fd)
+                    current_chunk->fd->bk = new_chunk;
+
+                current_chunk->size = aligned_size;
+                current_chunk->fd = new_chunk;
+            }
+
             current_chunk->flags |= INUSE_BIT;
             current_chunk->flags = (current_chunk->flags & 0xF0) | (priv & 0x0F); // store priv in lower 4 bits of current_chunk->flags byte
 

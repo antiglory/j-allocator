@@ -36,7 +36,6 @@ In file: /.../.../.../.../.../source/main.c:164
    163
  ► 164   jfree(chunk1);
 ──────────────────────────────────────────────────────────────────────────
-
 pwndbg> p jcachebin
 $1 = {0x555555559000, 0x0 <repeats 15 times>}
 pwndbg> p *jcachebin[0]
@@ -119,7 +118,7 @@ void* jalloc(const size_t size, const byte_t priv) {
     // search for a reusable chunk in the current bin
     while (current_chunk != NULL) {
         if (current_chunk->size >= aligned_size && !(current_chunk->flags & INUSE_BIT)) {
-            size_t remaining_size = current_chunk->size - aligned_size;
+            const size_t remaining_size = current_chunk->size - aligned_size;
 
             if (remaining_size >= sizeof(chunk_t) + CHUNK_ALIGNMENT_BYTES) {
                 // split the chunk if there's enough space for a new chunk
@@ -142,9 +141,8 @@ void* jalloc(const size_t size, const byte_t priv) {
 
             void* payload_area = (void*)((char*)current_chunk + sizeof(chunk_t));
 
-            if (mprotect((void*)((uintptr_t)payload_area & ~(page_size - 1)), aligned_size, protection_flags) == -1) {
+            if (mprotect((void*)((uintptr_t)payload_area & ~(page_size - 1)), aligned_size, protection_flags) == -1)
                 return NULL;
-            }
 
             return payload_area;
         }

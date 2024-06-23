@@ -193,9 +193,9 @@ void* jalloc(const size_t size, const byte_t priv) {
 
 // a part of jalloc implementation, is a function to free the allocated chunk
 void jfree(void* _Ptr) {
-    if (!ptr) return;
+    if (!_Ptr) return;
 
-    chunk_t* chunk = (chunk_t*)((char*)ptr - sizeof(chunk_t)); // getting the chunk headers
+    chunk_t* chunk = (chunk_t*)((char*)_Ptr - sizeof(chunk_t)); // getting the chunk headers
 
     if (!(chunk->flags & INUSE_BIT)) return; // sanity check
 

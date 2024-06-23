@@ -73,7 +73,7 @@ static size_t jalignsize(const size_t size) {
 }
 
 // helper to get jcache index
-static int jgetbinindex(const size_t size) {
+static int32_t jgetbinindex(const size_t size) {
     return (size / JCACHE_SIZE_INCREMENT) < JCACHE_CHUNK_AMOUNT ? (size / JCACHE_SIZE_INCREMENT) : (JCACHE_CHUNK_AMOUNT - 1);
 }
 
@@ -88,6 +88,8 @@ static void jcoalescechunk(chunk_t* chunk) {
         if (next_chunk->fd)
             next_chunk->fd->bk = chunk;
     }
+
+    return;
 }
 
 // jalloc main implementation
@@ -120,18 +122,20 @@ void* jalloc(const size_t size, const byte_t priv) {
         if (current_chunk->size >= aligned_size && !(current_chunk->flags & INUSE_BIT)) {
             const size_t remaining_size = current_chunk->size - aligned_size;
 
+            // found chunk can be used only if the new chunk size be smaller than the current size (if exists a chunk in the fd)
             if (remaining_size >= sizeof(chunk_t) + CHUNK_ALIGNMENT_BYTES) {
                 // split the chunk if there's enough space for a new chunk
                 chunk_t* new_chunk = (chunk_t*)((char*)current_chunk + aligned_size);
-                new_chunk->size = remaining_size;
+                new_chunk->size = remaining_size; // changing chunk size with the new size
                 new_chunk->hsize = sizeof(chunk_t);
-                new_chunk->flags = current_chunk->flags & ~INUSE_BIT; // clear INUSE_BIT for new chunk
+                new_chunk->flags = current_chunk->flags & ~INUSE_BIT; // clear INUSE_BIT for a new chunk
                 new_chunk->fd = current_chunk->fd;
                 new_chunk->bk = current_chunk;
 
                 if (current_chunk->fd)
                     current_chunk->fd->bk = new_chunk;
 
+                // if no forward chunk
                 current_chunk->size = aligned_size;
                 current_chunk->fd = new_chunk;
             }
@@ -141,10 +145,12 @@ void* jalloc(const size_t size, const byte_t priv) {
 
             void* payload_area = (void*)((char*)current_chunk + sizeof(chunk_t));
 
+            // setting permissions with basis on the requested privilleges
             if (mprotect((void*)((uintptr_t)payload_area & ~(page_size - 1)), aligned_size, protection_flags) == -1)
                 return NULL;
 
             return payload_area;
+            // the payload area is the area which is read for use by the user
         }
 
         previous_chunk = current_chunk;
@@ -174,6 +180,7 @@ void* jalloc(const size_t size, const byte_t priv) {
 
     void* payload_area = (void*)((char*)new_chunk + sizeof(chunk_t));
 
+    // setting permissions with basis on the requested privilleges
     if (mprotect((void*)((uintptr_t)payload_area & ~(page_size - 1)), aligned_size, protection_flags) == -1) {
         return NULL;
     }
@@ -184,23 +191,24 @@ void* jalloc(const size_t size, const byte_t priv) {
     // the payload area is the area which is read for use by the user
 }
 
-
 // a part of jalloc implementation, is a function to free the allocated chunk
-void jfree(void* ptr) {
+void jfree(void* _Ptr) {
     if (!ptr) return;
 
-    chunk_t* chunk = (chunk_t*)((char*)ptr - sizeof(chunk_t));
+    chunk_t* chunk = (chunk_t*)((char*)ptr - sizeof(chunk_t)); // getting the chunk headers
 
     if (!(chunk->flags & INUSE_BIT)) return; // sanity check
 
-    chunk->flags &= ~INUSE_BIT;
+    chunk->flags &= ~INUSE_BIT; // cleared INUSE_BIT
 
     if (chunk->fd) {
         chunk->fd->bk = chunk->bk;
+        // the backward chunk of the forward chunk was set to the backward of the chunk which is being freed
     }
 
     if (chunk->bk) {
         chunk->bk->fd = chunk->fd;
+        // the backward chunk's forward chunk was set to the forward chunk of the chunk which is being freed
     } else {
         if (chunk->fd) {
             const int bin_index = jgetbinindex(chunk->size);

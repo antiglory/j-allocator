@@ -78,8 +78,11 @@ static int32_t jgetbinindex(const size_t size) {
 }
 
 // helper to coalesce a chunk
-static void jcoalescechunk(chunk_t* chunk) {
+static int32_t jcoalescechunk(chunk_t* chunk) {
+    if (!chunk) return JC_ERROR_INVALID_POINTER;
+
     const chunk_t* next_chunk = (chunk_t*)((char*)chunk + chunk->size);
+    if (!next_chunk) return JC_ERROR_INVALID_POINTER;
 
     if (!(next_chunk->flags & INUSE_BIT)) {
         chunk->size += next_chunk->size;
@@ -89,7 +92,7 @@ static void jcoalescechunk(chunk_t* chunk) {
             next_chunk->fd->bk = chunk;
     }
 
-    return;
+    return 0;
 }
 
 // jalloc main implementation
@@ -127,7 +130,6 @@ void* jalloc(const size_t size, const byte_t priv) {
                 // split the chunk if there's enough space for a new chunk
                 chunk_t* new_chunk = (chunk_t*)((char*)current_chunk + aligned_size);
                 new_chunk->size = remaining_size; // changing chunk size with the new size
-                new_chunk->hsize = sizeof(chunk_t);
                 new_chunk->flags = current_chunk->flags & ~INUSE_BIT; // clear INUSE_BIT for a new chunk
                 new_chunk->fd = current_chunk->fd;
                 new_chunk->bk = current_chunk;
@@ -192,12 +194,21 @@ void* jalloc(const size_t size, const byte_t priv) {
 }
 
 // a part of jalloc implementation, is a function to free the allocated chunk
-void jfree(void* _Ptr) {
-    if (!_Ptr) return;
+int32_t jfree(void* _Ptr) {
+    if (!_Ptr) return JF_ERROR_INVALID_POINTER;
 
     chunk_t* chunk = (chunk_t*)((char*)_Ptr - sizeof(chunk_t)); // getting the chunk headers
 
-    if (!(chunk->flags & INUSE_BIT)) return; // sanity check
+    // sanity check
+    if (!(chunk->flags & INUSE_BIT)) {
+        // if chunk is not at use
+        for (int i = 0; i < JCACHE_CHUNK_AMOUNT; i++) {
+            if ((chunk_t*)jcachebin[i] == chunk) {
+                // if chunk is at the jcache
+                return JF_ERROR_DOUBLE_FREE;
+            }
+        }
+    }
 
     chunk->flags &= ~INUSE_BIT; // cleared INUSE_BIT
 
@@ -216,7 +227,8 @@ void jfree(void* _Ptr) {
         } // if no chunk->fd, just keep the chunk in jcache but set it as out of use
     }
 
-    jcoalescechunk(chunk);
+    int32_t coalescence = jcoalescechunk(chunk);
+    return coalescence; // also a error code
 }
 
 int main(void) {

@@ -208,7 +208,7 @@ void jfree(void* _Ptr) {
 
     if (chunk->bk) {
         chunk->bk->fd = chunk->fd;
-        // the backward chunk's forward chunk was set to the forward chunk of the chunk which is being freed
+        // the backward chunk fd was set to the forward chunk of the chunk which is being freed
     } else {
         if (chunk->fd) {
             const int bin_index = jgetbinindex(chunk->size);

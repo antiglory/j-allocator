@@ -1,11 +1,12 @@
 # j-allocator
 a very simple and basic linux heap allocator written in C
 
-# features
+# features and aspects
 - first fit and segregated free list heap allocator (has aspects of both);
 - performs linear searches to allocate new chunks or to find existing chunks;
-- chunks have robust identification from the headers.
+- chunks have robust identification from the headers;
 - uses bins as the basis of the algorithm;
+- the allocator is not thread-safe, in other words, it is theoretically incompatible to use the allocator in more than one thread of the process, as data may be overwritten, the same chunk allocated to more than one thread, etc.
 
 # note
 - same as libc allocator, the responsibility of not exceeding the bounds of the allocated chunk belongs to the programmer/you;

@@ -6,7 +6,8 @@ a very simple and basic linux heap allocator written in C
 - performs linear searches to allocate new chunks or to find existing chunks;
 - chunks have robust identification from the headers;
 - uses bins as the basis of the algorithm;
-- the allocator is not thread-safe, in other words, it is theoretically incompatible to use the allocator in more than one thread of the process, as data may be overwritten, the same chunk allocated to more than one thread, etc.
+- not a thread-safe allocator, in other words, it is theoretically incompatible to use the allocator in more than one thread of the process, as data may be overwritten, the same chunk allocated to more than one thread, etc;
+- not as efficient in sanity checks and bin traversal due to using a big computational effort in very large allocations.
 
 # note
 - same as libc allocator, the responsibility of not exceeding the bounds of the allocated chunk belongs to the programmer/you;

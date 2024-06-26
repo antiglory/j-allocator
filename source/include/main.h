@@ -4,7 +4,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <inttypes.h>
 
 // macros
@@ -22,6 +24,10 @@
 #define JA_ERROR_VALIDATE_PRIV  0x51
 #define JA_ERROR_PERMISSION_SET 0x52
 #define JA_ERROR_HEAP_ADJUST    0x55
+
+#define JI_ERROR_SHM_OPEN   0x15
+#define JI_ERROR_FTRUNCATE  0x16
+#define JI_ERROR_MMAP       0x17
 
 #define JCACHE_CHUNK_AMOUNT   16
 #define JCACHE_SIZE_INCREMENT 128
@@ -47,5 +53,11 @@ typedef struct chunk_t {
     struct chunk_t* bk; // backward chunk pointer
     // chunk_t is approximately 40 bytes long, enemy of overhead :(
 } chunk_t;
+
+typedef struct {
+    chunk_t* jcachebin[JCACHE_CHUNK_AMOUNT];
+    int32_t jerrorcode;
+    byte_t initialized;
+} jinfo_t;
 
 #endif

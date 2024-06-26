@@ -6,7 +6,7 @@ example of the (double) linked algorithm between chunks:
 (compiled with: `gcc -g -o main main.c`)
 
 (code)
-#include "include/headers/j.c"
+#include "source/j.c"
 
 int main(void) {
     char* chunk1 = jalloc(sizeof(int), PROT_READ_BIT | PROT_WRITE_BIT);

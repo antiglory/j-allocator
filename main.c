@@ -11,8 +11,13 @@ int main(void) {
 
     int* chunk = jalloc(sizeof(c), PROT_READ_BIT | PROT_WRITE_BIT | PROT_EXEC_BIT);
     if (!chunk) {
-        printf("%d\n", jinfo->jerrorcode);
-        return 1;
+        if (!jinfo) {
+            puts("abort: jalloc");
+            return 1;
+        } else {
+            printf("%d\n", jinfo->jerrorcode);
+            return 1;
+        }
     }
 
     memcpy(chunk, c, sizeof(c));

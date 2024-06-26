@@ -67,6 +67,9 @@ $4 = {
 // initializing jalloc main bin
 chunk_t* jcachebin[JCACHE_CHUNK_AMOUNT] = {NULL};
 
+// initializing error code saving
+int32_t jerrorcode = 0x0;
+
 // helper to align chunk size
 static size_t jalignsize(const size_t size) {
     return (size + CHUNK_ALIGNMENT_BYTES - 1) & ~(CHUNK_ALIGNMENT_BYTES - 1);
@@ -78,11 +81,18 @@ static int32_t jgetbinindex(const size_t size) {
 }
 
 // helper to coalesce a chunk
-static int32_t jcoalescechunk(chunk_t* chunk) {
-    if (!chunk) return JC_ERROR_INVALID_POINTER;
+static void jcoalescechunk(chunk_t* chunk) {
+    if (!chunk) {
+        jerrorcode = JC_ERROR_INVALID_POINTER;
+        return;
+    }
 
     const chunk_t* next_chunk = (chunk_t*)((char*)chunk + chunk->size);
-    if (!next_chunk) return JC_ERROR_INVALID_POINTER;
+
+    if (!next_chunk) {
+        jerrorcode = JC_ERROR_INVALID_POINTER;
+        return;
+    }
 
     if (!(next_chunk->flags & INUSE_BIT)) {
         chunk->size += next_chunk->size;
@@ -91,8 +101,6 @@ static int32_t jcoalescechunk(chunk_t* chunk) {
         if (next_chunk->fd)
             next_chunk->fd->bk = chunk;
     }
-
-    return 0;
 }
 
 // jalloc main implementation
@@ -194,8 +202,11 @@ void* jalloc(const size_t size, const byte_t priv) {
 }
 
 // a part of jalloc implementation, is a function to free the allocated chunk
-int32_t jfree(void* _Ptr) {
-    if (!_Ptr) return JF_ERROR_INVALID_POINTER;
+void jfree(void* _Ptr) {
+    if (!_Ptr) {
+        jerrorcode = JF_ERROR_INVALID_POINTER;
+        return;
+    }
 
     chunk_t* chunk = (chunk_t*)((char*)_Ptr - sizeof(chunk_t)); // getting the chunk headers
 
@@ -205,7 +216,8 @@ int32_t jfree(void* _Ptr) {
         for (int i = 0; i < JCACHE_CHUNK_AMOUNT; i++) {
             if ((chunk_t*)jcachebin[i] == chunk) {
                 // if chunk is at the jcache
-                return JF_ERROR_DOUBLE_FREE;
+                jerrorcode = JF_ERROR_DOUBLE_FREE;
+                return;
             }
         }
     }
@@ -227,8 +239,9 @@ int32_t jfree(void* _Ptr) {
         } // if no chunk->fd, just keep the chunk in jcache but set it as out of use
     }
 
-    int32_t coalescence = jcoalescechunk(chunk);
-    return coalescence; // also a error code
+    jcoalescechunk(chunk);
+
+    return;
 }
 
 int main(void) {
@@ -240,7 +253,10 @@ int main(void) {
     };
 
     int* chunk = jalloc(sizeof(c), PROT_READ_BIT | PROT_WRITE_BIT | PROT_EXEC_BIT);
-    if (!chunk) return 1;
+    if (!chunk) {
+        printf("%d\n", jerrorcode);
+        return 1;
+    }
 
     memcpy(chunk, c, sizeof(c));
 

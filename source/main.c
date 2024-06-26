@@ -36,17 +36,17 @@ In file: /.../.../.../.../.../source/main.c:164
    163
  ► 164   jfree(chunk1);
 ──────────────────────────────────────────────────────────────────────────
-pwndbg> p jcachebin
-$1 = {0x555555559000, 0x0 <repeats 15 times>}
-pwndbg> p *jcachebin[0]
+pwndbg> p jinfo->jcachebin
+$1 = {0x555555559060, 0x0 <repeats 15 times>}
+pwndbg> p *(jinfo->jcachebin[0])
 $2 = {
   size = 48,
   hsize = 40,
   flags = 3 '\003',
-  fd = 0x555555559030,
-  bk = 0x0
+  fd = 0x0,
+  bk = 0x555555559030
 }
-pwndbg> p *((*jcachebin[0])->fd)
+pwndbg> p *(*(jinfo->jcachebin[0]))->bk
 $3 = {
   size = 48,
   hsize = 40,
@@ -54,21 +54,17 @@ $3 = {
   fd = 0x555555559060,
   bk = 0x555555559000
 }
-pwndbg> p *(*(jcachebin[0])->fd)->fd
+pwndbg> p *((*(*(jinfo->jcachebin[0]))->bk)->bk)
 $4 = {
   size = 48,
   hsize = 40,
   flags = 3 '\003',
-  fd = 0x0,
-  bk = 0x555555559030
+  fd = 0x555555559030,
+  bk = 0x0
 }
 */
 
-// initializing jalloc main bin
-chunk_t* jcachebin[JCACHE_CHUNK_AMOUNT] = {NULL};
-
-// initializing error code saving
-int32_t jerrorcode = 0x0;
+jinfo_t* jinfo = NULL;
 
 // helper to align chunk size
 static size_t jalignsize(const size_t size) {
@@ -83,7 +79,7 @@ static int32_t jgetbinindex(const size_t size) {
 // helper to coalesce a chunk
 static void jcoalescechunk(chunk_t* chunk) {
     if (!chunk) {
-        jerrorcode = JC_ERROR_INVALID_POINTER;
+        jinfo->jerrorcode = JC_ERROR_INVALID_POINTER;
         return;
     }
 
@@ -111,16 +107,67 @@ static void jcoalescechunk(chunk_t* chunk) {
     }
 
     // update bin ptrs
-    int bin_index = jgetbinindex(chunk->size);
+    const int bin_index = jgetbinindex(chunk->size);
 
-    if (jcachebin[bin_index] == chunk->bk)
-        jcachebin[bin_index] = chunk;
+    if (jinfo->jcachebin[bin_index] == chunk->bk)
+        jinfo->jcachebin[bin_index] = chunk;
 
     return;
 }
 
+// function to initialize jallocator info structure
+static int32_t jinit(void) {
+    const char *shm_name = "/j";
+    const size_t size = sizeof(jinfo_t);
+
+    int32_t temp_ret_code = 0x0;
+
+    const int fd = shm_open(shm_name, O_CREAT | O_RDWR, 0666);
+
+    if (fd == -1) {
+        temp_ret_code = JI_ERROR_SHM_OPEN;
+        return temp_ret_code;
+    }
+
+    if (ftruncate(fd, size) == -1) {
+        temp_ret_code = JI_ERROR_FTRUNCATE;
+
+        close(fd);
+        shm_unlink(shm_name);
+
+        return temp_ret_code;
+    }
+
+    jinfo = (jinfo_t*)mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (jinfo == MAP_FAILED) {
+        temp_ret_code = JI_ERROR_MMAP;
+
+        close(fd);
+        shm_unlink(shm_name);
+
+        return temp_ret_code;
+    }
+
+    close(fd);
+
+    jinfo->jerrorcode = 0;
+    jinfo->initialized = 1;
+
+    for (int i = 0; i < JCACHE_CHUNK_AMOUNT; ++i) {
+        jinfo->jcachebin[i] = NULL;
+    }
+
+    return temp_ret_code;
+}
+
 // jalloc main implementation
 void* jalloc(const size_t size, const byte_t priv) {
+    if (!jinfo)
+        if (jinit() != 0x0) {
+            perror("abort: jinit()");
+            return NULL;
+        }
+
     int protection_flags;
 
     const size_t aligned_size = jalignsize(size + sizeof(chunk_t));
@@ -130,7 +177,7 @@ void* jalloc(const size_t size, const byte_t priv) {
 
     // validate the priv bits
     if ((priv & 0x7) != priv) {
-        jerrorcode = JA_ERROR_VALIDATE_PRIV;
+        jinfo->jerrorcode = JA_ERROR_VALIDATE_PRIV;
         return NULL;
     }
 
@@ -143,7 +190,7 @@ void* jalloc(const size_t size, const byte_t priv) {
     // find the appropriate bin
     const int bin_index = jgetbinindex(aligned_size);
 
-    chunk_t* current_chunk = jcachebin[bin_index];
+    chunk_t* current_chunk = jinfo->jcachebin[bin_index];
     chunk_t* previous_chunk = NULL;
 
     // search for a reusable chunk in the current bin
@@ -175,7 +222,7 @@ void* jalloc(const size_t size, const byte_t priv) {
 
             // setting permissions with basis on the requested privilleges
             if (mprotect((void*)((uintptr_t)payload_area & ~(page_size - 1)), aligned_size, protection_flags) == -1) {
-                jerrorcode = JA_ERROR_PERMISSION_SET;
+                jinfo->jerrorcode = JA_ERROR_PERMISSION_SET;
                 return NULL;
             }
 
@@ -191,7 +238,7 @@ void* jalloc(const size_t size, const byte_t priv) {
     chunk = sbrk(0);
 
     if (sbrk(aligned_size) == (void*)-1) {
-        jerrorcode = JA_ERROR_HEAP_ADJUST;
+        jinfo->jerrorcode = JA_ERROR_HEAP_ADJUST;
         return NULL;
     }
 
@@ -208,13 +255,13 @@ void* jalloc(const size_t size, const byte_t priv) {
     if (previous_chunk != NULL)
         previous_chunk->fd = new_chunk;
     else
-        jcachebin[bin_index] = new_chunk;
+        jinfo->jcachebin[bin_index] = new_chunk;
 
     void* payload_area = (void*)((char*)new_chunk + sizeof(chunk_t));
 
     // setting permissions with basis on the requested privilleges
     if (mprotect((void*)((uintptr_t)payload_area & ~(page_size - 1)), aligned_size, protection_flags) == -1) {
-        jerrorcode = JA_ERROR_PERMISSION_SET;
+        jinfo->jerrorcode = JA_ERROR_PERMISSION_SET;
         return NULL;
     }
 
@@ -227,7 +274,7 @@ void* jalloc(const size_t size, const byte_t priv) {
 // a part of jalloc implementation, is a function to free the allocated chunk
 void jfree(void* _Ptr) {
     if (!_Ptr) {
-        jerrorcode = JF_ERROR_INVALID_POINTER;
+        jinfo->jerrorcode = JF_ERROR_INVALID_POINTER;
         return;
     }
 
@@ -236,9 +283,9 @@ void jfree(void* _Ptr) {
     if (!(chunk->flags & INUSE_BIT)) {
         // chunk is not in use
         for (int i = 0; i < JCACHE_CHUNK_AMOUNT; i++) {
-            if ((chunk_t*)jcachebin[i] == chunk) {
+            if ((chunk_t*)jinfo->jcachebin[i] == chunk) {
                 // chunk already is in jcache
-                jerrorcode = JF_ERROR_DOUBLE_FREE;
+                jinfo->jerrorcode = JF_ERROR_DOUBLE_FREE;
                 return;
             }
         }
@@ -248,18 +295,19 @@ void jfree(void* _Ptr) {
 
     jcoalescechunk(chunk); // coalesce with forward, backward and existing chunks
 
-    if (jerrorcode == JC_ERROR_INVALID_POINTER)
+    if (jinfo->jerrorcode == JC_ERROR_INVALID_POINTER)
         return;
 
     // after coalescing, updates the jcache
-    int bin_index = jgetbinindex(chunk->size);
+    const int bin_index = jgetbinindex(chunk->size);
 
-    if (!chunk->bk || jcachebin[bin_index] == chunk->bk)
-        jcachebin[bin_index] = chunk;
+    if (!chunk->bk || jinfo->jcachebin[bin_index] == chunk->bk)
+        jinfo->jcachebin[bin_index] = chunk;
 
     return;
 }
 
+/*
 int main(void) {
     // (code)
     const char c[] = {
@@ -270,7 +318,7 @@ int main(void) {
 
     int* chunk = jalloc(sizeof(c), PROT_READ_BIT | PROT_WRITE_BIT | PROT_EXEC_BIT);
     if (!chunk) {
-        printf("%d\n", jerrorcode);
+        printf("%d\n", jinfo->jerrorcode);
         return 1;
     }
 
@@ -284,3 +332,4 @@ int main(void) {
     jfree(chunk);
     return 0;
 }
+*/

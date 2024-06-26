@@ -38,7 +38,7 @@ typedef struct chunk_t {
     byte_t flags;       // PREV_INUSE, INUSE and MMAPED
     struct chunk_t* fd; // forward chunk pointer
     struct chunk_t* bk; // backward chunk pointer
-    // chunk_t is approximately 40 bytes long
+    // chunk_t is approximately 40 bytes long, enemy of overhead :(
 } chunk_t;
 
 #endif

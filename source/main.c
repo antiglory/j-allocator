@@ -54,7 +54,7 @@ $3 = {
   fd = 0x555555559060,
   bk = 0x555555559000
 }
-pwndbg> p *(*jcachebin[0]->fd)->fd
+pwndbg> p *(*(jcachebin[0])->fd)->fd
 $4 = {
   size = 48,
   hsize = 40,
@@ -129,8 +129,10 @@ void* jalloc(const size_t size, const byte_t priv) {
     void* chunk; // page start
 
     // validate the priv bits
-    if ((priv & 0x7) != priv)
+    if ((priv & 0x7) != priv) {
+        jerrorcode = JA_ERROR_VALIDATE_PRIV;
         return NULL;
+    }
 
     // set the memory protection flags
     if (priv & PROT_EXEC_BIT)
@@ -172,8 +174,10 @@ void* jalloc(const size_t size, const byte_t priv) {
             void* payload_area = (void*)((char*)current_chunk + sizeof(chunk_t));
 
             // setting permissions with basis on the requested privilleges
-            if (mprotect((void*)((uintptr_t)payload_area & ~(page_size - 1)), aligned_size, protection_flags) == -1)
+            if (mprotect((void*)((uintptr_t)payload_area & ~(page_size - 1)), aligned_size, protection_flags) == -1) {
+                jerrorcode = JA_ERROR_PERMISSION_SET;
                 return NULL;
+            }
 
             return payload_area;
             // the payload area is the area which is read for use by the user
@@ -186,8 +190,10 @@ void* jalloc(const size_t size, const byte_t priv) {
     // no reusable chunk found, then allocate a new one
     chunk = sbrk(0);
 
-    if (sbrk(aligned_size) == (void*)-1)
+    if (sbrk(aligned_size) == (void*)-1) {
+        jerrorcode = JA_ERROR_HEAP_ADJUST;
         return NULL;
+    }
 
     memset(chunk, 0, aligned_size);
 
@@ -208,6 +214,7 @@ void* jalloc(const size_t size, const byte_t priv) {
 
     // setting permissions with basis on the requested privilleges
     if (mprotect((void*)((uintptr_t)payload_area & ~(page_size - 1)), aligned_size, protection_flags) == -1) {
+        jerrorcode = JA_ERROR_PERMISSION_SET;
         return NULL;
     }
 

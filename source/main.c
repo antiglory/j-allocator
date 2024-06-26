@@ -87,20 +87,36 @@ static void jcoalescechunk(chunk_t* chunk) {
         return;
     }
 
-    const chunk_t* next_chunk = (chunk_t*)((char*)chunk + chunk->size);
+    chunk_t* next_chunk = (chunk_t*)((char*)chunk + chunk->size);
+    chunk_t* prev_chunk = chunk->bk;
 
-    if (!next_chunk) {
-        jerrorcode = JC_ERROR_INVALID_POINTER;
-        return;
-    }
-
-    if (!(next_chunk->flags & INUSE_BIT)) {
+    // coalesce with the next chunk if its free
+    if (next_chunk && !(next_chunk->flags & INUSE_BIT)) {
         chunk->size += next_chunk->size;
         chunk->fd = next_chunk->fd;
 
         if (next_chunk->fd)
             next_chunk->fd->bk = chunk;
     }
+
+    // coalesce with the previous chunk if its free
+    if (prev_chunk && !(prev_chunk->flags & INUSE_BIT)) {
+        prev_chunk->size += chunk->size;
+        prev_chunk->fd = chunk->fd;
+
+        if (chunk->fd)
+            chunk->fd->bk = prev_chunk;
+
+        chunk = prev_chunk;
+    }
+
+    // update bin ptrs
+    int bin_index = jgetbinindex(chunk->size);
+
+    if (jcachebin[bin_index] == chunk->bk)
+        jcachebin[bin_index] = chunk;
+
+    return;
 }
 
 // jalloc main implementation
@@ -208,38 +224,31 @@ void jfree(void* _Ptr) {
         return;
     }
 
-    chunk_t* chunk = (chunk_t*)((char*)_Ptr - sizeof(chunk_t)); // getting the chunk headers
+    chunk_t* chunk = (chunk_t*)((char*)_Ptr - sizeof(chunk_t));
 
-    // sanity check
     if (!(chunk->flags & INUSE_BIT)) {
-        // if chunk is not at use
+        // chunk is not in use
         for (int i = 0; i < JCACHE_CHUNK_AMOUNT; i++) {
             if ((chunk_t*)jcachebin[i] == chunk) {
-                // if chunk is at the jcache
+                // chunk already is in jcache
                 jerrorcode = JF_ERROR_DOUBLE_FREE;
                 return;
             }
         }
     }
 
-    chunk->flags &= ~INUSE_BIT; // cleared INUSE_BIT
+    chunk->flags &= ~INUSE_BIT; // clears INUSE bit
 
-    if (chunk->fd) {
-        chunk->fd->bk = chunk->bk;
-        // the backward chunk of the forward chunk was set to the backward of the chunk which is being freed
-    }
+    jcoalescechunk(chunk); // coalesce with forward, backward and existing chunks
 
-    if (chunk->bk) {
-        chunk->bk->fd = chunk->fd;
-        // the backward chunk fd was set to the forward chunk of the chunk which is being freed
-    } else {
-        if (chunk->fd) {
-            const int bin_index = jgetbinindex(chunk->size);
-            jcachebin[bin_index] = chunk->fd;
-        } // if no chunk->fd, just keep the chunk in jcache but set it as out of use
-    }
+    if (jerrorcode == JC_ERROR_INVALID_POINTER)
+        return;
 
-    jcoalescechunk(chunk);
+    // after coalescing, updates the jcache
+    int bin_index = jgetbinindex(chunk->size);
+
+    if (!chunk->bk || jcachebin[bin_index] == chunk->bk)
+        jcachebin[bin_index] = chunk;
 
     return;
 }

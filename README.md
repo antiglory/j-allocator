@@ -10,7 +10,6 @@ a very simple and basic linux heap allocator written in C
 - not a thread-safe allocator, in other words, it is theoretically incompatible to use the allocator in more than one thread of the process, as data may be overwritten, the same chunk allocated to more than one thread, etc;
 - not as efficient in sanity checks and bin traversal due to using a big computational effort in very large allocations;
 - memory overhead can occur in very small allocations (around 1 to 64 bytes) due to the size of the chunk headers, which is a bit exaggerated (around 40 bytes at 64 bits arch);
-- if you encounter a segfault when trying to access `heap_info->jerrorcode`, it means that the error was that the heap configuration (`heap_config` structure) was not initialized.
 
 # note
 - same as libc allocator, the responsibility of not exceeding the bounds of the allocated chunk belongs to the programmer/you;

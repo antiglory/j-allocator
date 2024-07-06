@@ -6,8 +6,6 @@ example of the (double) linked algorithm between chunks:
 (compiled with: `gcc -g -o main main.c`)
 
 (code)
-#include "source/j.c"
-
 int main(void) {
     char* chunk1 = jalloc(sizeof(int), PROT_READ_BIT | PROT_WRITE_BIT);
     char* chunk2 = jalloc(sizeof(int), PROT_READ_BIT | PROT_WRITE_BIT);
@@ -245,7 +243,9 @@ void* jalloc(const size_t size, const byte_t priv) {
         return NULL;
     }
 
-    memset(chunk, 0, aligned_size);
+    // only fill chunk space with zeros if its size is smaller than page size (4096 normally)
+    if (aligned_size < page_size)
+        memset(chunk, 0, aligned_size);
 
     // initializing a new chunk's headers
     chunk_t* new_chunk = (chunk_t*)chunk;

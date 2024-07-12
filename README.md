@@ -3,12 +3,12 @@ __(just-allocate)__
 a very simple and basic linux heap allocator written in C
 
 # features and aspects
-- first fit and segregated free list heap allocator (has aspects of both);
+- first fit and segregated free list allocator (has aspects of both);
 - performs linear searches to allocate new chunks or to find existing chunks;
 - chunks have robust identification from the headers;
 - uses bins as the basis of the algorithm;
 - the linear search through bins could be slow for large bins;
-- not a thread-safe allocator, in other words, it is theoretically incompatible to use the allocator in more than one thread of the process, as data may be overwritten, the same chunk allocated to more than one thread, etc;
+- not a thread-safe allocator, in other words, it is theoretically incompatible to use the allocator in more than one thread of the process, as data may be overwritten, the same chunk can be allocated to more than one thread, etc;
 - not as efficient in sanity checks and bin traversal due to using a big computational effort in very large allocations;
 - memory overhead can occur in very small allocations (around 1 to 64 bytes) due to the size of the chunk headers, which is a bit exaggerated (around 40 bytes at 64 bits arch);
 

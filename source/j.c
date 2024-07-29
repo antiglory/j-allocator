@@ -1,5 +1,21 @@
 #include "include/headers/j.h"
 
+/* some abbreviations of object's name (to clarify understanding) 
+
+    - priv: privillege/s
+    - fd: file descriptor or forward
+    - bk: backward
+
+    - _n: name
+    - h/_h: header/s
+    - j: just (pun on the name of the allocator)
+
+    - JC: jcoalescechunk
+    - JF: jfree
+    - JI: jinit
+    - JA: jalloc
+*/
+
 /*
 example of the (double) linked algorithm between chunks:
 
@@ -11,7 +27,7 @@ int main(void) {
     char* chunk2 = jalloc(sizeof(int), PROT_READ_BIT | PROT_WRITE_BIT);
     char* chunk3 = jalloc(sizeof(int), PROT_READ_BIT | PROT_WRITE_BIT);
 
-    if (!chunk1 || !chunk2 || !chunk3) return 0;
+    if (!chunk1 || !chunk2 || !chunk3) return 1;
 
     *chunk1 = 10;
     *chunk2 = 20;
@@ -107,7 +123,7 @@ static void jcoalescechunk(chunk_t* chunk) {
     }
 
     // update bin ptrs
-    const int bin_index = jgetbinindex(chunk->size);
+    const int32_t bin_index = jgetbinindex(chunk->size);
 
     if (jinfo->jcachebin[bin_index] == chunk->bk)
         jinfo->jcachebin[bin_index] = chunk;
@@ -117,38 +133,39 @@ static void jcoalescechunk(chunk_t* chunk) {
 
 // function to initialize jallocator info structure
 static int32_t jinit(void) {
-    const char *shm_name = "/j";
+    const char* shm_n = "/j";
     const size_t size = sizeof(jinfo_t);
 
     int32_t temp_ret_code = 0x0;
 
-    const int fd = shm_open(shm_name, O_CREAT | O_RDWR, 0666);
+    // jsection descriptor
+    const int32_t sd = shm_open(shm_n, O_CREAT | O_RDWR, 0666);
 
-    if (fd == -1) {
+    if (sd == -1) {
         temp_ret_code = JI_ERROR_SHM_OPEN;
         return temp_ret_code;
     }
 
-    if (ftruncate(fd, size) == -1) {
+    if (ftruncate(sd, size) == -1) {
         temp_ret_code = JI_ERROR_FTRUNCATE;
 
-        close(fd);
-        shm_unlink(shm_name);
+        close(sd);
+        shm_unlink(shm_n);
 
         return temp_ret_code;
     }
 
-    jinfo = (jinfo_t*)mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    jinfo = (jinfo_t*)mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, sd, 0);
     if (jinfo == MAP_FAILED) {
         temp_ret_code = JI_ERROR_MMAP;
 
-        close(fd);
-        shm_unlink(shm_name);
+        close(sd);
+        shm_unlink(shm_n);
 
         return temp_ret_code;
     }
 
-    close(fd);
+    close(sd);
 
     jinfo->jerrorcode = 0;
     jinfo->initialized = 1;
@@ -165,16 +182,16 @@ void* jalloc(const size_t size, const byte_t priv) {
     // jinfo sanity check
     if (!jinfo)
         if (jinit() != 0x0) {
-            perror("abort: jinit");
+            puts("abort: jinit");
             return NULL;
         }
 
-    int protection_flags;
+    int32_t protection_flags;
 
     const size_t aligned_size = jalignsize(size + sizeof(chunk_t));
     const size_t page_size = sysconf(_SC_PAGESIZE);
 
-    void* chunk; // page start
+    void* chunk; // page start?
 
     // validate the priv bits
     if ((priv & 0x7) != priv) {
@@ -189,7 +206,7 @@ void* jalloc(const size_t size, const byte_t priv) {
         protection_flags = PROT_READ | PROT_WRITE;
 
     // find the appropriate bin
-    const int bin_index = jgetbinindex(aligned_size);
+    const int32_t bin_index = jgetbinindex(aligned_size);
 
     chunk_t* current_chunk = jinfo->jcachebin[bin_index];
     chunk_t* previous_chunk = NULL;
@@ -276,10 +293,12 @@ void* jalloc(const size_t size, const byte_t priv) {
 
 // a part of jalloc implementation, is a function to free the allocated chunk
 void jfree(void* _Ptr) {
-    // jinfo sanity check
+    // _Ptr is the pointer to the allocated chunk which will be free
+
+    // jinfo structure sanity checks
     if (!jinfo)
         if (jinit() != 0x0) {
-            perror("abort: jinit");
+            puts("abort: jinit");
             return;
         }
 

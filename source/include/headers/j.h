@@ -3,11 +3,11 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
+#include <inttypes.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <inttypes.h>
 
 // macros
 #define TRUE  1
@@ -51,7 +51,7 @@ typedef struct chunk_t {
     byte_t flags;       // PREV_INUSE, INUSE and MMAPED
     struct chunk_t* fd; // forward chunk pointer
     struct chunk_t* bk; // backward chunk pointer
-    // chunk_t is approximately 40 bytes long, enemy of overhead :(
+    // chunk_t is approximately 40 bytes long (enemy of overhead) :(
 } chunk_t;
 
 typedef struct {

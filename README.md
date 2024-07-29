@@ -7,6 +7,7 @@ a very simple and basic linux heap allocator written in C
 - performs linear searches to allocate new chunks or to find existing chunks;
 - chunks have robust identification from the headers;
 - uses bins as the basis of the algorithm;
+- has a reasonable flexibility in terms of the privileges of the allocated chunks, each chunk has its own privileges, which can be useful in contexts where several chunks with different purposes are allocated in the same region;
 - the linear search through bins could be slow for large bins;
 - not a thread-safe allocator, in other words, it is theoretically incompatible to use the allocator in more than one thread of the process, as data may be overwritten, the same chunk can be allocated to more than one thread, etc;
 - not as efficient in sanity checks and bin traversal due to using a big computational effort in very large allocations;

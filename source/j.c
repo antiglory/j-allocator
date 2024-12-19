@@ -329,9 +329,9 @@ void* jalloc(const size_t size, const byte_t priv)
 }
 
 // a part of jalloc implementation, is a function to free the allocated chunk
-void jfree(void* _Ptr)
+void jfree(void* ptr)
 {
-    // _Ptr is the pointer to the allocated chunk which will be free
+    // ptr is the pointer to the allocated chunk which will be free
 
     // jinfo structure sanity checks
     if (!jinfo)
@@ -341,13 +341,13 @@ void jfree(void* _Ptr)
             return;
         }
 
-    if (!_Ptr)
+    if (!ptr)
     {
         jinfo->jerrorcode = JF_ERROR_INVALID_POINTER;
         return;
     }
 
-    chunk_t* chunk = (chunk_t*)((char*)_Ptr - sizeof(chunk_t));
+    chunk_t* chunk = (chunk_t*)((char*)ptr - sizeof(chunk_t));
 
     if (!(chunk->flags & INUSE_BIT))
     {

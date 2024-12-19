@@ -83,18 +83,22 @@ $4 = {
 jinfo_t* jinfo = NULL;
 
 // helper to align chunk size
-static size_t jalignsize(const size_t size) {
+static size_t jalignsize(const size_t size)
+{
     return (size + CHUNK_ALIGNMENT_BYTES - 1) & ~(CHUNK_ALIGNMENT_BYTES - 1);
 }
 
 // helper to get jcache index
-static int32_t jgetbinindex(const size_t size) {
+static int32_t jgetbinindex(const size_t size)
+{
     return (size / JCACHE_SIZE_INCREMENT) < JCACHE_CHUNK_AMOUNT ? (size / JCACHE_SIZE_INCREMENT) : (JCACHE_CHUNK_AMOUNT - 1);
 }
 
 // helper to coalesce a chunk
-static void jcoalescechunk(chunk_t* chunk) {
-    if (!chunk) {
+static void jcoalescechunk(chunk_t* chunk)
+{
+    if (!chunk)
+    {
         jinfo->jerrorcode = JC_ERROR_INVALID_POINTER;
         return;
     }
@@ -103,16 +107,18 @@ static void jcoalescechunk(chunk_t* chunk) {
     chunk_t* prev_chunk = chunk->bk;
 
     // coalesce with the next chunk if its free
-    if (next_chunk && !(next_chunk->flags & INUSE_BIT)) {
+    if (next_chunk && !(next_chunk->flags & INUSE_BIT))
+    {
         chunk->size += next_chunk->size;
-        chunk->fd = next_chunk->fd;
+        chunk->fd    = next_chunk->fd;
 
         if (next_chunk->fd)
             next_chunk->fd->bk = chunk;
     }
 
     // coalesce with the previous chunk if its free
-    if (prev_chunk && !(prev_chunk->flags & INUSE_BIT)) {
+    if (prev_chunk && !(prev_chunk->flags & INUSE_BIT))
+    {
         prev_chunk->size += chunk->size;
         prev_chunk->fd = chunk->fd;
 
@@ -133,20 +139,22 @@ static void jcoalescechunk(chunk_t* chunk) {
 
 // function to initialize jallocator info structure
 static int32_t jinit(void) {
-    const char* shm_n = "/j";
-    const size_t size = sizeof(jinfo_t);
-
     int32_t temp_ret_code = 0x0;
+
+    const char*  shm_n = "/j";
+    const size_t size  = sizeof(jinfo_t);
 
     // jsection descriptor
     const int32_t sd = shm_open(shm_n, O_CREAT | O_RDWR, 0666);
 
-    if (sd == -1) {
+    if (sd == -1)
+    {
         temp_ret_code = JI_ERROR_SHM_OPEN;
         return temp_ret_code;
     }
 
-    if (ftruncate(sd, size) == -1) {
+    if (ftruncate(sd, size) == -1)
+    {
         temp_ret_code = JI_ERROR_FTRUNCATE;
 
         close(sd);
@@ -155,8 +163,17 @@ static int32_t jinit(void) {
         return temp_ret_code;
     }
 
-    jinfo = (jinfo_t*)mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, sd, 0);
-    if (jinfo == MAP_FAILED) {
+    jinfo = (jinfo_t*)mmap(
+        NULL,
+        size,
+        PROT_READ | PROT_WRITE,
+        MAP_SHARED,
+        sd,
+        0
+    );
+
+    if (jinfo == MAP_FAILED)
+    {
         temp_ret_code = JI_ERROR_MMAP;
 
         close(sd);
@@ -167,10 +184,11 @@ static int32_t jinit(void) {
 
     close(sd);
 
-    jinfo->jerrorcode = 0;
+    jinfo->jerrorcode  = 0;
     jinfo->initialized = 1;
 
-    for (int i = 0; i < JCACHE_CHUNK_AMOUNT; ++i) {
+    for (int i = 0; i < JCACHE_CHUNK_AMOUNT; ++i)
+    {
         jinfo->jcachebin[i] = NULL;
     }
 
@@ -178,10 +196,12 @@ static int32_t jinit(void) {
 }
 
 // jalloc main implementation
-void* jalloc(const size_t size, const byte_t priv) {
+void* jalloc(const size_t size, const byte_t priv)
+{
     // jinfo sanity check
     if (!jinfo)
-        if (jinit() != 0x0) {
+        if (jinit() != 0x0)
+        {
             puts("abort: jinit");
             return NULL;
         }
@@ -189,12 +209,13 @@ void* jalloc(const size_t size, const byte_t priv) {
     int32_t protection_flags;
 
     const size_t aligned_size = jalignsize(size + sizeof(chunk_t));
-    const size_t page_size = sysconf(_SC_PAGESIZE);
+    const size_t page_size    = sysconf(_SC_PAGESIZE);
 
     void* chunk; // page start?
 
     // validate the priv bits
-    if ((priv & 0x7) != priv) {
+    if ((priv & 0x7) != priv)
+    {
         jinfo->jerrorcode = JA_ERROR_VALIDATE_PRIV;
         return NULL;
     }
@@ -208,38 +229,47 @@ void* jalloc(const size_t size, const byte_t priv) {
     // find the appropriate bin
     const int32_t bin_index = jgetbinindex(aligned_size);
 
-    chunk_t* current_chunk = jinfo->jcachebin[bin_index];
+    chunk_t* current_chunk  = jinfo->jcachebin[bin_index];
     chunk_t* previous_chunk = NULL;
 
     // search for a reusable chunk in the current bin
-    while (current_chunk != NULL) {
-        if (current_chunk->size >= aligned_size && !(current_chunk->flags & INUSE_BIT)) {
+    while (current_chunk != NULL)
+    {
+        if (current_chunk->size >= aligned_size && !(current_chunk->flags & INUSE_BIT))
+        {
             const size_t remaining_size = current_chunk->size - aligned_size;
 
             // found chunk can be used only if the new chunk size be smaller than the current size (if exists a chunk in the fd)
-            if (remaining_size >= sizeof(chunk_t) + CHUNK_ALIGNMENT_BYTES) {
+            if (remaining_size >= sizeof(chunk_t) + CHUNK_ALIGNMENT_BYTES)
+            {
                 // split the chunk if there's enough space for a new chunk
                 chunk_t* new_chunk = (chunk_t*)((char*)current_chunk + aligned_size);
-                new_chunk->size = remaining_size; // changing chunk size with the new size
+                new_chunk->size  = remaining_size; // changing chunk size with the new size
                 new_chunk->flags = current_chunk->flags & ~INUSE_BIT; // clear INUSE_BIT for a new chunk
-                new_chunk->fd = current_chunk->fd;
-                new_chunk->bk = current_chunk;
+                new_chunk->fd    = current_chunk->fd;
+                new_chunk->bk    = current_chunk;
 
                 if (current_chunk->fd)
                     current_chunk->fd->bk = new_chunk;
 
                 // if no forward chunk
                 current_chunk->size = aligned_size;
-                current_chunk->fd = new_chunk;
+                current_chunk->fd   = new_chunk;
             }
 
             current_chunk->flags |= INUSE_BIT;
-            current_chunk->flags = (current_chunk->flags & 0xF0) | (priv & 0x0F); // store priv in lower 4 bits of current_chunk->flags byte
+            current_chunk->flags  = (current_chunk->flags & 0xF0) | (priv & 0x0F); // store priv in lower 4 bits of current_chunk->flags byte
 
             void* payload_area = (void*)((char*)current_chunk + sizeof(chunk_t));
 
             // setting permissions with basis on the requested privilleges
-            if (mprotect((void*)((uintptr_t)payload_area & ~(page_size - 1)), aligned_size, protection_flags) == -1) {
+            if (
+                mprotect(
+                    (void*)((uintptr_t)payload_area & ~(page_size - 1)),
+                    aligned_size,
+                    protection_flags
+            ) == -1)
+            {
                 jinfo->jerrorcode = JA_ERROR_PERMISSION_SET;
                 return NULL;
             }
@@ -255,7 +285,8 @@ void* jalloc(const size_t size, const byte_t priv) {
     // no reusable chunk found, then allocate a new one
     chunk = sbrk(0);
 
-    if (sbrk(aligned_size) == (void*)-1) {
+    if (sbrk(aligned_size) == (void*)-1)
+    {
         jinfo->jerrorcode = JA_ERROR_HEAP_ADJUST;
         return NULL;
     }
@@ -266,11 +297,11 @@ void* jalloc(const size_t size, const byte_t priv) {
 
     // initializing a new chunk's headers
     chunk_t* new_chunk = (chunk_t*)chunk;
-    new_chunk->size = aligned_size;
-    new_chunk->hsize = sizeof(chunk_t);
-    new_chunk->flags = INUSE_BIT | (priv & 0x0F);
-    new_chunk->fd = NULL;
-    new_chunk->bk = previous_chunk;
+    new_chunk->size    = aligned_size;
+    new_chunk->hsize   = sizeof(chunk_t);
+    new_chunk->flags   = INUSE_BIT | (priv & 0x0F);
+    new_chunk->fd      = NULL;
+    new_chunk->bk      = previous_chunk;
 
     if (previous_chunk != NULL)
         previous_chunk->fd = new_chunk;
@@ -280,7 +311,13 @@ void* jalloc(const size_t size, const byte_t priv) {
     void* payload_area = (void*)((char*)new_chunk + sizeof(chunk_t));
 
     // setting permissions with basis on the requested privilleges
-    if (mprotect((void*)((uintptr_t)payload_area & ~(page_size - 1)), aligned_size, protection_flags) == -1) {
+    if (
+        mprotect(
+            (void*)((uintptr_t)payload_area & ~(page_size - 1)),
+            aligned_size,
+            protection_flags
+        ) == -1)
+    {
         jinfo->jerrorcode = JA_ERROR_PERMISSION_SET;
         return NULL;
     }
@@ -292,27 +329,33 @@ void* jalloc(const size_t size, const byte_t priv) {
 }
 
 // a part of jalloc implementation, is a function to free the allocated chunk
-void jfree(void* _Ptr) {
+void jfree(void* _Ptr)
+{
     // _Ptr is the pointer to the allocated chunk which will be free
 
     // jinfo structure sanity checks
     if (!jinfo)
-        if (jinit() != 0x0) {
+        if (jinit() != 0x0)
+        {
             puts("abort: jinit");
             return;
         }
 
-    if (!_Ptr) {
+    if (!_Ptr)
+    {
         jinfo->jerrorcode = JF_ERROR_INVALID_POINTER;
         return;
     }
 
     chunk_t* chunk = (chunk_t*)((char*)_Ptr - sizeof(chunk_t));
 
-    if (!(chunk->flags & INUSE_BIT)) {
+    if (!(chunk->flags & INUSE_BIT))
+    {
         // chunk is not in use
-        for (int i = 0; i < JCACHE_CHUNK_AMOUNT; i++) {
-            if ((chunk_t*)jinfo->jcachebin[i] == chunk) {
+        for (int i = 0; i < JCACHE_CHUNK_AMOUNT; i++)
+        {
+            if ((chunk_t*)jinfo->jcachebin[i] == chunk)
+            {
                 // chunk already is in jcache
                 jinfo->jerrorcode = JF_ERROR_DOUBLE_FREE;
                 return;
@@ -324,11 +367,10 @@ void jfree(void* _Ptr) {
 
     jcoalescechunk(chunk); // coalesce with forward, backward and existing chunks
 
-    if (jinfo->jerrorcode == JC_ERROR_INVALID_POINTER)
-        return;
+    if (jinfo->jerrorcode == JC_ERROR_INVALID_POINTER) return;
 
     // after coalescing, updates the jcache
-    const int bin_index = jgetbinindex(chunk->size);
+    const int32_t bin_index = jgetbinindex(chunk->size);
 
     if (!chunk->bk || jinfo->jcachebin[bin_index] == chunk->bk)
         jinfo->jcachebin[bin_index] = chunk;

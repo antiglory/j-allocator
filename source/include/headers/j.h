@@ -25,9 +25,9 @@
 #define JA_ERROR_PERMISSION_SET 0x52
 #define JA_ERROR_HEAP_ADJUST    0x55
 
-#define JI_ERROR_SHM_OPEN   0x15
-#define JI_ERROR_FTRUNCATE  0x16
-#define JI_ERROR_MMAP       0x17
+#define JI_ERROR_SHM_OPEN     0x15
+#define JI_ERROR_FTRUNCATE    0x16
+#define JI_ERROR_MMAP         0x17
 
 #define JCACHE_CHUNK_AMOUNT   16
 #define JCACHE_SIZE_INCREMENT 128
@@ -46,22 +46,22 @@
 typedef unsigned char byte_t;
 
 typedef struct chunk_t {
-    size_t size;        // chunk size
-    size_t hsize;       // headers size
-    byte_t flags;       // PREV_INUSE, INUSE and MMAPED
-    struct chunk_t* fd; // forward chunk pointer
-    struct chunk_t* bk; // backward chunk pointer
-    // chunk_t is approximately 40 bytes long (enemy of overhead) :(
+    size_t          size;   // chunk size
+    size_t          hsize;  // headers size
+    byte_t          flags;  // PREV_INUSE, INUSE and MMAPED
+    struct chunk_t* fd;     // forward chunk pointer
+    struct chunk_t* bk;     // backward chunk pointer
+    // chunk_t is approximately 40 bytes long (this may trigger overhead)
 } chunk_t;
 
 typedef struct {
     chunk_t* jcachebin[JCACHE_CHUNK_AMOUNT];
-    int32_t jerrorcode;
-    byte_t initialized;
+    int32_t  jerrorcode;
+    byte_t   initialized;
 } jinfo_t;
 
 // settings
 __attribute__((visibility("default"))) void* jalloc(size_t size, byte_t priv);
-__attribute__((visibility("default"))) void jfree(void* ptr);
+__attribute__((visibility("default"))) void  jfree(void* ptr);
 
 #endif

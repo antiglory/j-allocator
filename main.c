@@ -10,11 +10,15 @@ int main(void) {
     };
 
     int* chunk = jalloc(sizeof(c), PROT_READ_BIT | PROT_WRITE_BIT | PROT_EXEC_BIT);
-    if (!chunk) {
-        if (!jinfo) {
+    if (!chunk)
+    {
+        if (!jinfo)
+        {
             puts("abort: jalloc");
             return 1;
-        } else {
+        } 
+        else
+        {
             printf("%d\n", jinfo->jerrorcode);
             return 1;
         }

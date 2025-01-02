@@ -1,7 +1,8 @@
 // example of j-allocator usage
 #include "source/j.c"
 
-int main(void) {
+int main(void)
+{
     // (code)
     const char c[] = {
         0x90, 0x90,                    // nop^2

@@ -1,6 +1,6 @@
 # j-allocator
 __just-allocate(or)__
-a very simple and basic linux heap allocator written in C
+basic linux heap allocator written in C
 
 # features and aspects
 - first fit and segregated free list allocator (has aspects of both);
